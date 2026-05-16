@@ -1,12 +1,24 @@
 {
   "name": "ai-code-parser",
   "displayName": "AI Code Parser",
-  "version": "0.0.1",
+  "description": "Apply AI-generated code operations and edits directly inside VS Code with side-by-side diff previews.",
+  "version": "1.0.0",
+  "publisher": "vadym-hrynyk",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
+    "AI",
+    "Formatters",
     "Other"
+  ],
+  "keywords": [
+    "ai",
+    "json",
+    "parser",
+    "refactor",
+    "patch"
   ],
   "activationEvents": [
     "onCommand:aiCodeParser.open"
@@ -22,7 +34,8 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
   },
   "devDependencies": {
     "@types/node": "^20.19.41",
