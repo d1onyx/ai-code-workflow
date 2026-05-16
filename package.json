@@ -2,9 +2,15 @@
   "name": "ai-code-parser",
   "displayName": "AI Code Parser",
   "version": "0.0.1",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Other"],
-  "activationEvents": ["onCommand:aiCodeParser.open"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:aiCodeParser.open"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -19,7 +25,7 @@
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
-    "@types/node": "^20.14.0",
+    "@types/node": "^20.19.41",
     "@types/vscode": "^1.90.0",
     "typescript": "^5.4.0"
   }

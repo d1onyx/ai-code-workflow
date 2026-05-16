@@ -559,29 +559,49 @@ async function writeTempFile(dir: string, name: string, content: string): Promis
 }
 
 async function previewChanges(result: ApplyResult): Promise<void> {
+  if (result.changes.length === 0) {
+    throw new Error("No changes to preview.");
+  }
+
+  const picked = await vscode.window.showQuickPick(
+    result.changes.map(change => ({
+      label: change.file,
+      description:
+        change.before === null
+          ? "CREATE"
+          : change.after === null
+            ? "DELETE"
+            : "MODIFY",
+      change
+    })),
+    {
+      placeHolder: "Select file to preview"
+    }
+  );
+
+  if (!picked) return;
+
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-json-preview-"));
 
-  for (const change of result.changes) {
-    const beforeUri = await writeTempFile(
-      dir,
-      `before__${change.file}`,
-      change.before ?? ""
-    );
+  const beforeUri = await writeTempFile(
+    dir,
+    `before__${picked.change.file}`,
+    picked.change.before ?? ""
+  );
 
-    const afterUri = await writeTempFile(
-      dir,
-      `after__${change.file}`,
-      change.after ?? ""
-    );
+  const afterUri = await writeTempFile(
+    dir,
+    `after__${picked.change.file}`,
+    picked.change.after ?? ""
+  );
 
-    await vscode.commands.executeCommand(
-      "vscode.diff",
-      beforeUri,
-      afterUri,
-      `AI Preview: ${change.file}`,
-      { preview: false }
-    );
-  }
+  await vscode.commands.executeCommand(
+    "vscode.diff",
+    beforeUri,
+    afterUri,
+    `AI Preview: ${picked.change.file}`,
+    { preview: false }
+  );
 }
 
 async function ensureDir(absFile: string): Promise<void> {
@@ -829,6 +849,24 @@ export function activate(context: vscode.ExtensionContext) {
 
         const cleaned = cleanJsonInput(msg.input || "");
 
+        const sizeMb = Buffer.byteLength(cleaned, "utf8") / 1024 / 1024;
+
+        if (sizeMb > 1) {
+          const answer = await vscode.window.showWarningMessage(
+            `Large JSON input: ${sizeMb.toFixed(2)} MB. Continue?`,
+            { modal: true },
+            "Continue"
+          );
+
+          if (answer !== "Continue") {
+            panel.webview.postMessage({
+              message: "Cancelled large input."
+            });
+
+            return;
+          }
+        }
+
         if (msg.type === "clean") {
           panel.webview.postMessage({
             input: cleaned,
@@ -892,4 +930,4 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable);
 }
 
-export function deactivate() {}
+export function deactivate() { }
