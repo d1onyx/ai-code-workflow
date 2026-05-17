@@ -85,4 +85,8 @@ function validatePath(file: string): void {
   if (normalized === ".git" || normalized.startsWith(".git/")) {
     throw new Error(`.git modification blocked: ${file}`);
   }
+
+  if (normalized === "node_modules" || normalized.startsWith("node_modules/")) {
+    throw new Error(`node_modules modification blocked: ${file}`);
+  }
 }
