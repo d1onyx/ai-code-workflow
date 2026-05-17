@@ -283,6 +283,11 @@ function parsePayload(input: string): OperationsPayload {
   return data as OperationsPayload;
 }
 
+function formatJsonInput(input: string): string {
+  const data = parseJsonWithRepair(input);
+  return JSON.stringify(data, null, 2);
+}
+
 // ---------------------------------------------------------------------------
 // Path & operation validation
 // ---------------------------------------------------------------------------
@@ -667,21 +672,21 @@ function summarize(result: ApplyResult): string {
   for (const change of result.changes) {
     const ops = change.operations.map(op => op.type).join(", ");
     if (change.before === null) {
-      lines.push(`  ✚ CREATE  ${change.file}  [${ops}]`);
+      lines.push(`  CREATE  ${change.file}  [${ops}]`);
     } else if (change.after === null) {
-      lines.push(`  ✖ DELETE  ${change.file}  [${ops}]`);
+      lines.push(`  DELETE  ${change.file}  [${ops}]`);
     } else {
       const before = change.before.split("\n").length;
       const after = change.after!.split("\n").length;
       const delta = after - before;
       const sign = delta >= 0 ? `+${delta}` : `${delta}`;
-      lines.push(`  ✎ MODIFY  ${change.file}  [${ops}]  ${before} → ${after} lines (${sign})`);
+      lines.push(`  MODIFY  ${change.file}  [${ops}]  ${before} -> ${after} lines (${sign})`);
     }
   }
 
   if (result.warnings.length) {
     lines.push("", "Warnings:");
-    for (const w of result.warnings) lines.push(`  ⚠ ${w}`);
+    for (const w of result.warnings) lines.push(`  WARNING  ${w}`);
   }
 
   return lines.join("\n");
@@ -728,7 +733,7 @@ async function previewChanges(result: ApplyResult): Promise<void> {
     "vscode.diff",
     beforeUri,
     afterUri,
-    `AI Preview: ${picked.change.file}`,
+    `Preview: ${picked.change.file}`,
     { preview: false }
   );
 }
@@ -745,150 +750,298 @@ function getHtml(nonce: string): string {
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
 <style nonce="${nonce}">
-*, *::before, *::after { box-sizing: border-box; }
+:root {
+  color-scheme: dark light;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 
 body {
-  padding: 16px 20px;
+  min-height: 100vh;
+  padding: 0;
+  margin: 0;
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size);
   color: var(--vscode-foreground);
-  background: var(--vscode-editor-background);
-  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(62, 138, 204, 0.16), transparent 34rem),
+    radial-gradient(circle at bottom right, rgba(120, 80, 220, 0.10), transparent 28rem),
+    var(--vscode-editor-background);
 }
 
-.header {
-  display: flex;
+.shell {
+  width: min(1180px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0 20px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.kicker {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  width: fit-content;
+  padding: 4px 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 999px;
+  color: var(--vscode-descriptionForeground);
+  background: color-mix(in srgb, var(--vscode-editor-background) 72%, var(--vscode-button-background));
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-h2 { margin: 0; font-size: 1.15em; }
-
-.badge {
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
+h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 
 .hint {
-  opacity: 0.75;
-  margin: 6px 0 14px;
+  max-width: 760px;
+  margin: 9px 0 0;
+  color: var(--vscode-descriptionForeground);
   line-height: 1.55;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
-.bar {
+.card {
+  overflow: hidden;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 88%, var(--vscode-sideBar-background));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.22);
+}
+
+.toolbar {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background: color-mix(in srgb, var(--vscode-editor-background) 72%, var(--vscode-sideBar-background));
+}
+
+.button-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 10px;
 }
 
 button {
-  padding: 6px 13px;
+  appearance: none;
+  min-height: 32px;
+  padding: 7px 14px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 10px;
   border: 1px solid var(--vscode-button-border, transparent);
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
   font-size: 12px;
+  font-weight: 650;
   font-family: inherit;
-  transition: opacity 0.15s;
+  transition: transform 0.12s ease, opacity 0.12s ease, border-color 0.12s ease;
 }
-button:hover { opacity: 0.85; }
-button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+button:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 button.secondary {
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
 }
+
+button.ghost {
+  color: var(--vscode-foreground);
+  background: transparent;
+  border-color: var(--vscode-panel-border);
+}
+
+button.primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
 button.danger {
-  background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
-  color: var(--vscode-errorForeground, #f48771);
+  color: var(--vscode-button-foreground);
+  background: color-mix(in srgb, var(--vscode-inputValidation-errorBackground, #5a1d1d) 55%, var(--vscode-button-background));
   border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+}
+
+.editor-wrap {
+  position: relative;
+  padding: 14px;
 }
 
 textarea {
   width: 100%;
-  height: 50vh;
-  min-height: 120px;
+  height: 56vh;
+  min-height: 260px;
   resize: vertical;
+  display: block;
   font-family: var(--vscode-editor-font-family);
   font-size: 13px;
-  line-height: 1.45;
-  padding: 10px 12px;
-  background: var(--vscode-input-background);
+  line-height: 1.55;
+  padding: 16px;
+  background: color-mix(in srgb, var(--vscode-input-background) 90%, transparent);
   color: var(--vscode-input-foreground);
-  border: 1px solid var(--vscode-input-border);
-  border-radius: 3px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 14px;
   outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
-textarea:focus { border-color: var(--vscode-focusBorder); }
+
+textarea:focus {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--vscode-focusBorder) 28%, transparent);
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+#stats {
+  min-height: 16px;
+}
+
+.output-panel {
+  border-top: 1px solid var(--vscode-panel-border);
+  padding: 13px 14px 14px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 76%, var(--vscode-panel-background));
+}
 
 .output-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--vscode-descriptionForeground);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  opacity: 0.6;
-  margin: 10px 0 4px;
+  letter-spacing: 0.075em;
+  margin-bottom: 8px;
 }
 
 pre#output {
   white-space: pre-wrap;
   word-break: break-word;
-  padding: 10px 12px;
+  padding: 13px 14px;
   background: var(--vscode-terminal-background, var(--vscode-editor-background));
   border: 1px solid var(--vscode-panel-border);
-  border-radius: 3px;
-  max-height: 30vh;
+  border-radius: 12px;
+  max-height: 28vh;
   overflow: auto;
   font-family: var(--vscode-editor-font-family);
   font-size: 12px;
+  line-height: 1.5;
   margin: 0;
 }
 
-pre#output.error { color: var(--vscode-errorForeground, #f48771); }
-pre#output.success { color: var(--vscode-terminal-ansiGreen, #89d185); }
+pre#output.error {
+  color: var(--vscode-errorForeground, #f48771);
+  border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+}
 
-#stats {
-  font-size: 11px;
-  opacity: 0.6;
-  margin-top: 4px;
-  min-height: 16px;
+pre#output.success {
+  color: var(--vscode-terminal-ansiGreen, #89d185);
+}
+
+@media (max-width: 760px) {
+  .shell {
+    width: calc(100vw - 20px);
+    padding-top: 14px;
+  }
+
+  .hero,
+  .toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .button-group,
+  button {
+    width: 100%;
+  }
 }
 </style>
 </head>
 <body>
-  <div class="header">
-    <h2>AI Code Parser</h2>
-    <span class="badge">JSON Operations Mode</span>
-  </div>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <div class="kicker">JSON operations</div>
+        <h2>Code Patch Parser</h2>
+        <p class="hint">
+          Paste a JSON operations payload, format it, inspect the planned file changes, preview a diff, then apply safely.
+          Supported operations: replace, replace_all, replace_block, insert_before, insert_after, delete, create_file, delete_file, replace_file.
+        </p>
+      </div>
+    </section>
 
-  <div class="hint">
-    Paste JSON operations from your AI. Supports: replace, replace_all, replace_block,
-    insert_before, insert_after, delete, create_file, delete_file, replace_file.
-  </div>
+    <section class="card">
+      <div class="toolbar">
+        <div class="button-group">
+          <button id="load" class="secondary">Load file</button>
+          <button id="format" class="secondary">Format JSON</button>
+          <button id="analyze" class="primary">Analyze</button>
+          <button id="preview" class="primary">Preview</button>
+          <button id="apply" class="danger">Apply</button>
+        </div>
+        <div class="button-group">
+          <button id="clean" class="ghost">Clean</button>
+        </div>
+      </div>
 
-  <div class="bar">
-    <button id="load">📂 Load File</button>
-    <button id="example" class="secondary">💡 Example</button>
-    <button id="clean" class="secondary">🧹 Clean JSON</button>
-    <button id="analyze">🔍 Analyze</button>
-    <button id="preview">👁 Preview</button>
-    <button id="apply" class="danger">⚡ Apply</button>
-    <button id="clear" class="secondary">✕ Clear</button>
-  </div>
+      <div class="editor-wrap">
+        <textarea id="input" spellcheck="false" placeholder='{ "operations": [] }'></textarea>
+        <div class="status-row">
+          <div id="stats"></div>
+          <div>UTF-8 JSON payload</div>
+        </div>
+      </div>
 
-  <textarea id="input" spellcheck="false" placeholder='{ "operations": [] }'></textarea>
-  <div id="stats"></div>
-
-  <div class="output-label">Output</div>
-  <pre id="output">Ready.</pre>
+      <div class="output-panel">
+        <div class="output-label">
+          <span>Output</span>
+          <span id="output-state">Idle</span>
+        </div>
+        <pre id="output">Ready.</pre>
+      </div>
+    </section>
+  </main>
 
 <script nonce="${nonce}">
 (function () {
@@ -896,55 +1049,44 @@ pre#output.success { color: var(--vscode-terminal-ansiGreen, #89d185); }
   const input = document.getElementById("input");
   const output = document.getElementById("output");
   const stats = document.getElementById("stats");
+  const outputState = document.getElementById("output-state");
 
   function setStatus(msg, type) {
     output.textContent = msg;
     output.className = type || "";
+    outputState.textContent = type === "success" ? "Success" : type === "error" ? "Error" : "Idle";
   }
 
   function setStats() {
     const chars = input.value.length;
     const kb = (new TextEncoder().encode(input.value).byteLength / 1024).toFixed(1);
-    stats.textContent = chars > 0 ? chars.toLocaleString() + " chars \u00b7 " + kb + " KB" : "";
+    stats.textContent = chars > 0 ? chars.toLocaleString() + " chars · " + kb + " KB" : "Empty";
+  }
+
+  function persist() {
+    vscode.setState({ input: input.value });
   }
 
   function send(type) {
     vscode.postMessage({ type, input: input.value });
   }
 
-  input.addEventListener("input", setStats);
+  input.addEventListener("input", () => {
+    setStats();
+    persist();
+  });
 
   document.getElementById("load").onclick = () => send("load");
-  document.getElementById("clean").onclick = () => send("clean");
+  document.getElementById("format").onclick = () => send("format");
   document.getElementById("analyze").onclick = () => send("analyze");
   document.getElementById("preview").onclick = () => send("preview");
   document.getElementById("apply").onclick = () => send("apply");
 
-  document.getElementById("clear").onclick = () => {
+  document.getElementById("clean").onclick = () => {
     input.value = "";
-    setStatus("Cleared.", "");
+    setStatus("Cleaned.", "");
     setStats();
-  };
-
-  document.getElementById("example").onclick = () => {
-    input.value = JSON.stringify({
-      operations: [
-        {
-          type: "replace",
-          file: "some.txt",
-          search: "hello from patch",
-          replace: "hello world from JSON operation"
-        },
-        {
-          type: "insert_after",
-          file: "some.txt",
-          search: "new appended line",
-          text: "inserted by AI Code Parser"
-        }
-      ]
-    }, null, 2);
-    setStatus("Example inserted.", "");
-    setStats();
+    persist();
   };
 
   window.addEventListener("message", event => {
@@ -952,6 +1094,7 @@ pre#output.success { color: var(--vscode-terminal-ansiGreen, #89d185); }
     if (newInput !== undefined) {
       input.value = newInput;
       setStats();
+      persist();
     }
     if (message !== undefined) {
       setStatus(message, status || "");
@@ -961,12 +1104,8 @@ pre#output.success { color: var(--vscode-terminal-ansiGreen, #89d185); }
   const state = vscode.getState();
   if (state?.input) {
     input.value = state.input;
-    setStats();
   }
-
-  input.addEventListener("input", () => {
-    vscode.setState({ input: input.value });
-  });
+  setStats();
 })();
 </script>
 </body>
@@ -990,7 +1129,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const disposable = vscode.commands.registerCommand("aiCodeParser.open", () => {
     const panel = vscode.window.createWebviewPanel(
       "aiCodeParser",
-      "AI Code Parser",
+      "Code Patch Parser",
       vscode.ViewColumn.One,
       {
         enableScripts: true,
@@ -1014,7 +1153,7 @@ export function activate(context: vscode.ExtensionContext): void {
           const raw = await fs.readFile(selected[0].fsPath, "utf8");
           panel.webview.postMessage({
             input: cleanJsonInput(raw),
-            message: `✔ Loaded: ${selected[0].fsPath}`,
+            message: `Loaded: ${selected[0].fsPath}`,
             status: "success",
           });
           return;
@@ -1025,17 +1164,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
         if (mb > MAX_INPUT_MB) {
           panel.webview.postMessage({
-            message: `✖ Input too large (${mb.toFixed(2)} MB). Maximum is ${MAX_INPUT_MB} MB.`,
+            message: `Input too large (${mb.toFixed(2)} MB). Maximum is ${MAX_INPUT_MB} MB.`,
             status: "error",
           });
           return;
         }
 
-        if (msg.type === "clean") {
-          const cleaned = cleanJsonInput(raw);
+        if (msg.type === "format") {
+          const formatted = formatJsonInput(raw);
           panel.webview.postMessage({
-            input: cleaned,
-            message: "✔ JSON cleaned.",
+            input: formatted,
+            message: "JSON formatted.",
             status: "success",
           });
           return;
@@ -1060,7 +1199,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
         if (payload.operations.length === 0) {
           panel.webview.postMessage({
-            message: "⚠ No operations found in JSON.",
+            message: "No operations found in JSON.",
             status: "",
           });
           return;
@@ -1079,7 +1218,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (msg.type === "preview") {
           await previewChanges(result);
           panel.webview.postMessage({
-            message: ["✔ Preview opened.", "", summarize(result)].join("\n"),
+            message: ["Preview opened.", "", summarize(result)].join("\n"),
             status: "success",
           });
           return;
@@ -1100,13 +1239,13 @@ export function activate(context: vscode.ExtensionContext): void {
           await formatChangedFiles(repo, result);
 
           panel.webview.postMessage({
-            message: ["✔ Applied successfully.", "", summarize(result)].join("\n"),
+            message: ["Applied successfully.", "", summarize(result)].join("\n"),
             status: "success",
           });
         }
       } catch (e: any) {
         panel.webview.postMessage({
-          message: `✖ ${e.message ?? String(e)}`,
+          message: `${e.message ?? String(e)}`,
           status: "error",
         });
       }

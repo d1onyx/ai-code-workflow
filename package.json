@@ -2,7 +2,7 @@
   "name": "ai-code-parser",
   "displayName": "AI Code Parser",
   "description": "Apply AI-generated code operations and edits directly inside VS Code with side-by-side diff previews.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "vadym-hrynyk",
   "license": "MIT",
   "engines": {
