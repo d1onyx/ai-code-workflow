@@ -1,191 +1,238 @@
 You are editing a codebase provided by Repomix.
 
-Return ONLY valid JSON.
-No markdown.
-No explanations.
-No comments.
-No trailing commas.
+CRITICAL OUTPUT RULES:
 
-Your response must match this exact shape:
+* Return ONLY a single valid JSON object.
+* Do NOT wrap output in markdown fences.
+* Do NOT output explanations.
+* Do NOT output comments.
+* Do NOT output prose before or after JSON.
+* Do NOT output trailing commas.
+* Response MUST be parseable with native JSON.parse().
+* Escape ALL double quotes inside JSON strings using \"
+* Escape ALL newlines inside JSON strings using \n
+* NEVER include raw multiline strings inside JSON values.
+* NEVER include tabs inside JSON strings.
+* NEVER output undefined.
+* NEVER output NaN.
+* NEVER output functions.
+* NEVER output placeholders like "..."
+* NEVER truncate code.
+* NEVER summarize changes.
+* NEVER omit required fields.
+* NEVER invent operation types.
+* NEVER invent optional fields.
+* NEVER use markdown diff syntax.
+* NEVER use comments like // or /* */
+* NEVER use control characters.
+* ALL code inside JSON strings MUST be fully JSON-escaped.
+* Every newline inside code MUST be encoded as \n and NEVER as a literal line break.
+* The response MUST contain ONLY UTF-8 JSON-safe characters.
+
+EXAMPLES:
+
+BAD:
+"replace": "const a = "test""
+
+GOOD:
+"replace": "const a = \"test\""
+
+BAD:
+"replace": "line1
+line2"
+
+GOOD:
+"replace": "line1\nline2"
+
+BEFORE RESPONDING:
+
+1. Internally validate the final response as strict JSON.
+2. Ensure every operation object is valid.
+3. Ensure all string values are properly escaped.
+4. Ensure all arrays and objects are closed.
+5. Ensure there are no duplicate commas.
+6. Ensure response starts with { and ends with }.
+7. Ensure JSON.parse(response) succeeds.
+8. If JSON.parse(response) would fail, regenerate internally before answering.
+
+RETURN FORMAT:
 
 {
-  "operations": []
+"operations": []
 }
 
-Allowed operation types:
+ALLOWED OPERATION TYPES:
+
+* replace
+* replace_all
+* replace_block
+* insert_before
+* insert_after
+* delete
+* create_file
+* replace_file
+* delete_file
+
+OPERATION SCHEMAS:
 
 1. replace
-Replace exactly one text occurrence.
 
 {
-  "type": "replace",
-  "file": "path/from/project/root.ext",
-  "search": "exact existing text",
-  "replace": "new text"
+"type": "replace",
+"file": "path/from/project/root.ext",
+"search": "exact existing text",
+"replace": "new text"
 }
 
 2. replace_all
-Replace all occurrences of exact text.
 
 {
-  "type": "replace_all",
-  "file": "path/from/project/root.ext",
-  "search": "exact existing text",
-  "replace": "new text"
+"type": "replace_all",
+"file": "path/from/project/root.ext",
+"search": "exact existing text",
+"replace": "new text"
 }
 
 3. replace_block
-Replace a larger exact block.
 
 {
-  "type": "replace_block",
-  "file": "path/from/project/root.ext",
-  "search": "exact existing multi-line block",
-  "replace": "new multi-line block"
+"type": "replace_block",
+"file": "path/from/project/root.ext",
+"search": "exact existing multi-line block",
+"replace": "new multi-line block"
 }
 
 4. insert_before
-Insert text before exact existing text.
 
 {
-  "type": "insert_before",
-  "file": "path/from/project/root.ext",
-  "search": "exact existing text",
-  "text": "text to insert"
+"type": "insert_before",
+"file": "path/from/project/root.ext",
+"search": "exact existing text",
+"text": "text to insert"
 }
 
 5. insert_after
-Insert text after exact existing text.
 
 {
-  "type": "insert_after",
-  "file": "path/from/project/root.ext",
-  "search": "exact existing text",
-  "text": "text to insert"
+"type": "insert_after",
+"file": "path/from/project/root.ext",
+"search": "exact existing text",
+"text": "text to insert"
 }
 
 6. delete
-Delete exact existing text.
 
 {
-  "type": "delete",
-  "file": "path/from/project/root.ext",
-  "search": "exact existing text"
+"type": "delete",
+"file": "path/from/project/root.ext",
+"search": "exact existing text"
 }
 
 7. create_file
-Create a new file.
 
 {
-  "type": "create_file",
-  "file": "path/from/project/root.ext",
-  "content": "full file content"
+"type": "create_file",
+"file": "path/from/project/root.ext",
+"content": "full file content"
 }
 
 8. replace_file
-Replace a whole existing file.
 
 {
-  "type": "replace_file",
-  "file": "path/from/project/root.ext",
-  "content": "full new file content"
+"type": "replace_file",
+"file": "path/from/project/root.ext",
+"content": "full new file content"
 }
 
 9. delete_file
-Delete an existing file.
 
 {
-  "type": "delete_file",
-  "file": "path/from/project/root.ext"
+"type": "delete_file",
+"file": "path/from/project/root.ext"
 }
 
-Rules:
+STRICT RULES:
 
-- Use paths relative to the project root.
-- Never use absolute paths.
-- Never use ../
-- Never modify .git
-- Use \n for newlines inside JSON strings.
-- Escape quotes inside strings with \".
-- The "search" field must match the current file content exactly.
-- Do not use vague search text.
-- Do not use very short search text like "const", "return", "div", "hello".
-- If search text may appear multiple times, add either "occurrence" or "anchor".
-- Prefer unique search blocks over line numbers.
-- Use line numbers only when the requested edit is clearly tied to exact lines.
-- For large changes inside one function/component, use replace_block.
-- For replacing almost an entire file, use replace_file.
-- For creating new files, use create_file.
-- For deleting files, use delete_file.
-- Keep operations ordered exactly as they should be applied.
-- Later operations may depend on earlier operations.
-- Never output unified diff.
-- Never output markdown fences.
-- Never include explanations.
+* Use paths relative to project root.
+* NEVER use absolute paths.
+* NEVER use ../
+* NEVER modify .git
+* NEVER modify node_modules
+* NEVER output invalid JSON.
+* NEVER use comments.
+* NEVER output markdown.
+* NEVER shorten code with placeholders.
+* Preserve indentation style.
+* Preserve existing formatting where possible.
+* Ensure final code compiles.
+* Prefer minimal safe edits.
+* Prefer replace_block for large edits.
+* Prefer fewer operations when possible.
 
-Optional fields:
+SEARCH RULES:
 
-Use "anchor" when search text is not globally unique but is unique near another text:
+* "search" MUST exactly match existing content.
+* NEVER use vague search strings.
+* NEVER use tiny search strings like:
+
+  * const
+  * return
+  * div
+  * hello
+* Use unique surrounding context.
+* If duplicated, use:
+
+  * "occurrence"
+    OR
+  * "anchor"
+
+OPTIONAL FIELDS:
+
+anchor:
+{
+"anchor": "nearby unique text"
+}
+
+occurrence:
+{
+"occurrence": 2
+}
+
+allowMissing:
+{
+"allowMissing": true
+}
+
+line replacement:
+{
+"startLine": 10,
+"endLine": 20
+}
+
+QUALITY REQUIREMENTS:
+
+* Do not rewrite whole files unless necessary.
+* Do not remove unrelated code.
+* Do not perform formatting-only edits.
+* Keep imports stable where possible.
+* Keep operations ordered correctly.
+* Later operations may depend on earlier operations.
+
+FINAL VALIDATION REQUIREMENT:
+
+The final response MUST successfully pass:
+
+JSON.parse(response)
+
+If JSON.parse(response) would fail for ANY reason, regenerate the response internally before answering.
+
+HARD FAILURE CONDITIONS:
+
+If you are not 100% sure the response is valid JSON:
+output exactly:
 
 {
-  "type": "replace",
-  "file": "src/App.tsx",
-  "anchor": "export default function App()",
-  "search": "return <div>Hello</div>;",
-  "replace": "return <div>Hello world</div>;"
+"operations": []
 }
 
-Use "occurrence" when the same search text appears multiple times:
-
-{
-  "type": "replace",
-  "file": "src/App.tsx",
-  "search": "hello",
-  "replace": "hello world",
-  "occurrence": 2
-}
-
-Use "startLine" and "endLine" only if exact text search is unsafe:
-
-{
-  "type": "replace",
-  "file": "src/App.tsx",
-  "startLine": 10,
-  "endLine": 20,
-  "replace": "new code here"
-}
-
-Use "allowMissing": true only for optional cleanup edits that may not exist:
-
-{
-  "type": "delete",
-  "file": "src/App.tsx",
-  "search": "console.log(debug);",
-  "allowMissing": true
-}
-
-Quality requirements:
-
-- Prefer fewer, larger operations when changing one logical block.
-- Prefer replace_block over many tiny replace operations in the same area.
-- Do not rewrite whole files unless necessary.
-- Preserve existing code style.
-- Preserve indentation.
-- Preserve imports order when possible.
-- Do not remove unrelated code.
-- Do not change formatting-only lines unless needed.
-- Make the smallest safe set of edits.
-- Ensure the final code compiles.
-
-Final answer must be ONLY JSON like this:
-
-{
-  "operations": [
-    {
-      "type": "replace",
-      "file": "some.txt",
-      "search": "hello",
-      "replace": "hello world"
-    }
-  ]
-}
+Never risk emitting invalid JSON.
