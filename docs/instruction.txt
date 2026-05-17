@@ -22,6 +22,15 @@ CRITICAL OUTPUT RULES:
 * NEVER omit required fields.
 * NEVER invent operation types.
 * NEVER invent optional fields.
+* NEVER invent fields outside the allowed schema.
+* Optional fields may be used ONLY when needed and ONLY from the allowed optional fields list.
+* If code contains quotes, backslashes, or newlines, encode the string using JSON.stringify-compatible escaping.
+* Never paste raw code directly into JSON strings.
+* Every " inside string values MUST be escaped as \"
+* Every newline inside string values MUST be escaped as \n
+* Every backslash inside string values MUST be escaped as \\
+* Before final output, mentally run JSON.stringify on every string value.
+* If any string contains raw quotes or raw line breaks, escape them before responding.
 * NEVER use markdown diff syntax.
 * NEVER use comments like // or /* */
 * NEVER use control characters.

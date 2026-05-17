@@ -124,36 +124,157 @@ function normalizeNewlines(text: string): string {
 
 /**
  * Strips markdown fences and extracts the outermost JSON object.
- * Also removes trailing commas that break JSON.parse.
+ * Keeps this function conservative: deeper repairs happen only if JSON.parse fails.
  */
 function cleanJsonInput(input: string): string {
   let text = normalizeNewlines(input).trim();
 
   // Strip markdown code fences (e.g. ```json ... ```)
-  text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "");
+  text = text.replace(/^```(?:json|javascript|js|ts|typescript)?\s*/i, "").replace(/\s*```\s*$/i, "");
 
-  // Extract from first { to last }
+  // Normalize “smart quotes” that LLMs sometimes produce around JSON keys/values.
+  text = text
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'");
+
+  // Extract from first { to last }. This intentionally stays simple because
+  // LLM replies often contain prose before/after the JSON object.
   const firstBrace = text.indexOf("{");
   const lastBrace = text.lastIndexOf("}");
   if (firstBrace >= 0 && lastBrace > firstBrace) {
     text = text.slice(firstBrace, lastBrace + 1);
   }
 
-  // Remove trailing commas before ] or } — common LLM mistake
-  text = text.replace(/,\s*([}\]])/g, "$1");
+  return removeTrailingCommasOutsideStrings(text).trim();
+}
 
-  return text.trim();
+function removeTrailingCommasOutsideStrings(input: string): string {
+  let out = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+
+    if (inString) {
+      out += ch;
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      out += ch;
+      continue;
+    }
+
+    if (ch === ",") {
+      let j = i + 1;
+      while (j < input.length && /\s/.test(input[j])) j++;
+      if (input[j] === "}" || input[j] === "]") continue;
+    }
+
+    out += ch;
+  }
+
+  return out;
+}
+
+function parseJsonWithRepair(input: string): unknown {
+  const cleaned = cleanJsonInput(input);
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (firstError: any) {
+    const repaired = repairJsonStrings(cleaned);
+    try {
+      return JSON.parse(repaired);
+    } catch (secondError: any) {
+      throw new Error(
+        `Invalid JSON: ${firstError.message}\n` +
+        `Auto-repair also failed: ${secondError.message}\n\n` +
+        `Tip: the most reliable format is JSON with code blocks escaped as strings, ` +
+        `or use line-based operations (startLine/endLine) for large code replacements.`
+      );
+    }
+  }
+}
+
+/**
+ * Best-effort repair for the most common LLM JSON breakage:
+ * unescaped quotes and raw newlines inside string values, for example:
+ *   "replace": "const msg = "hello";"
+ *
+ * It is intentionally used only after normal JSON.parse fails.
+ */
+function repairJsonStrings(input: string): string {
+  let out = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+
+    if (!inString) {
+      if (ch === '"') inString = true;
+      out += ch;
+      continue;
+    }
+
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === "\\") {
+      out += ch;
+      escaped = true;
+      continue;
+    }
+
+    // Raw line breaks are illegal inside JSON strings.
+    if (ch === "\n") {
+      out += "\\n";
+      continue;
+    }
+
+    if (ch === '"') {
+      const next = nextNonWhitespace(input, i + 1);
+
+      // A quote closes a JSON string only when the next meaningful character
+      // is a structural JSON delimiter. Otherwise it is probably a quote from
+      // code/text that the LLM forgot to escape.
+      if (next === ":" || next === "," || next === "}" || next === "]" || next === "") {
+        inString = false;
+        out += ch;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+
+    out += ch;
+  }
+
+  return removeTrailingCommasOutsideStrings(out);
+}
+
+function nextNonWhitespace(text: string, start: number): string {
+  for (let i = start; i < text.length; i++) {
+    if (!/\s/.test(text[i])) return text[i];
+  }
+  return "";
 }
 
 function parsePayload(input: string): OperationsPayload {
-  const cleaned = cleanJsonInput(input);
-
-  let data: unknown;
-  try {
-    data = JSON.parse(cleaned);
-  } catch (e: any) {
-    throw new Error(`Invalid JSON: ${e.message}`);
-  }
+  const data = parseJsonWithRepair(input);
 
   if (!data || typeof data !== "object" || !Array.isArray((data as any).operations)) {
     throw new Error('Invalid payload. Expected: { "operations": [...] }');
