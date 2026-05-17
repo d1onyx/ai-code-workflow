@@ -103,12 +103,17 @@ function getHtml(nonce: string): string {
 <style nonce="${nonce}">
 :root {
   color-scheme: dark light;
-  --border: var(--vscode-panel-border);
+  --border: color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
   --muted: var(--vscode-descriptionForeground);
-  --surface: color-mix(in srgb, var(--vscode-editor-background) 88%, var(--vscode-sideBar-background));
-  --surface-strong: color-mix(in srgb, var(--vscode-editor-background) 72%, var(--vscode-sideBar-background));
-  --ok: var(--vscode-terminal-ansiGreen, #89d185);
-  --bad: var(--vscode-errorForeground, #f48771);
+  --surface: color-mix(in srgb, var(--vscode-editor-background) 94%, var(--vscode-sideBar-background));
+  --surface-strong: color-mix(in srgb, var(--vscode-editor-background) 80%, var(--vscode-sideBar-background));
+  --ok: #4ade80;
+  --bad: var(--vscode-errorForeground, #f87171);
+  --accent: #22d3ee;
+  --accent-dim: color-mix(in srgb, #22d3ee 18%, transparent);
+  --accent-border: color-mix(in srgb, #22d3ee 45%, transparent);
+  --radius: 6px;
+  --radius-lg: 10px;
 }
 
 *, *::before, *::after {
@@ -130,27 +135,40 @@ button, textarea {
 }
 
 .app {
-  width: min(1320px, calc(100vw - 56px));
+  width: min(1320px, calc(100vw - 48px));
   margin: 0 auto;
-  padding: 22px 0 26px;
+  padding: 24px 0 32px;
 }
 
 .topbar {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding-bottom: 14px;
+  padding-bottom: 20px;
   border-bottom: 1px solid var(--border);
 }
 
 .eyebrow {
-  margin-bottom: 7px;
-  color: var(--muted);
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
 }
 
 h1, h2, h3, p {
@@ -158,34 +176,47 @@ h1, h2, h3, p {
 }
 
 h1 {
-  font-size: 24px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   line-height: 1.2;
 }
 
 .subtitle {
-  max-width: 760px;
-  margin-top: 6px;
+  max-width: 680px;
+  margin-top: 5px;
   color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .tabs {
   display: inline-grid;
   grid-template-columns: 1fr 1fr;
-  min-width: 390px;
+  min-width: 340px;
   padding: 3px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--surface-strong);
+  gap: 2px;
 }
 
 .tab {
-  min-height: 34px;
-  border-radius: 6px;
+  min-height: 32px;
+  border-radius: calc(var(--radius-lg) - 3px);
   border: 0;
   color: var(--muted);
   background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: color 0.15s, background 0.15s;
+  cursor: pointer;
+}
+
+.tab:hover:not(.active) {
+  color: var(--vscode-foreground);
+  background: color-mix(in srgb, var(--vscode-button-background) 20%, transparent);
 }
 
 .tab.active {
@@ -195,9 +226,9 @@ h1 {
 
 .workspace {
   display: none;
-  grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
-  gap: 14px;
-  margin-top: 14px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .workspace.active {
@@ -207,7 +238,7 @@ h1 {
 .panel {
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
   overflow: hidden;
 }
@@ -217,20 +248,24 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 48px;
-  padding: 12px 14px;
+  min-height: 46px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-strong);
 }
 
 .panel-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--vscode-foreground);
 }
 
 .panel-note {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 11px;
+  margin-top: 2px;
 }
 
 .panel-body {
@@ -240,41 +275,51 @@ h1 {
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 button {
   appearance: none;
-  min-height: 32px;
-  padding: 7px 12px;
+  min-height: 30px;
+  padding: 5px 11px;
   cursor: pointer;
-  border-radius: 7px;
-  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--vscode-button-background) 60%, transparent);
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: opacity 0.12s, box-shadow 0.12s;
 }
 
 button:hover {
-  opacity: 0.92;
+  opacity: 0.88;
+  box-shadow: 0 0 0 2px var(--accent-dim);
 }
 
 button:disabled {
-  opacity: 0.45;
+  opacity: 0.35;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 button.secondary {
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
+  border-color: var(--border);
 }
 
 button.ghost {
   color: var(--vscode-foreground);
   background: transparent;
   border-color: var(--border);
+}
+
+button.ghost:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 
 button.danger {
@@ -284,17 +329,25 @@ button.danger {
 }
 
 button.success-cta {
-  color: var(--vscode-button-foreground);
-  background: color-mix(in srgb, var(--ok) 42%, var(--vscode-button-background));
-  border-color: color-mix(in srgb, var(--ok) 68%, var(--vscode-button-border, transparent));
+  color: #fff;
+  background: color-mix(in srgb, var(--ok) 55%, #16a34a);
+  border-color: color-mix(in srgb, var(--ok) 70%, transparent);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+button.success-cta:hover {
+  opacity: 0.9;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ok) 30%, transparent);
 }
 
 label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -303,33 +356,36 @@ textarea {
   width: 100%;
   min-height: 320px;
   resize: vertical;
-  padding: 13px 14px;
-  border: 1px solid var(--vscode-input-border, var(--border));
-  border-radius: 8px;
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   outline: none;
-  background: var(--vscode-input-background);
+  background: color-mix(in srgb, var(--vscode-input-background) 90%, transparent);
   color: var(--vscode-input-foreground);
   font-family: var(--vscode-editor-font-family);
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 12.5px;
+  line-height: 1.6;
+  transition: border-color 0.15s;
 }
 
 textarea:focus {
-  border-color: var(--vscode-focusBorder);
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px var(--accent-dim);
 }
 
 select {
-  width: 148px;
-  min-height: 32px;
-  padding: 6px 34px 6px 12px;
-  border: 1px solid var(--vscode-dropdown-border, var(--border));
-  border-radius: 7px;
+  width: 138px;
+  min-height: 30px;
+  padding: 5px 28px 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   color: var(--vscode-dropdown-foreground);
   background: var(--vscode-dropdown-background);
+  font-size: 11.5px;
 }
 
 .prompt-box {
-  min-height: 255px;
+  min-height: 240px;
 }
 
 .prepared-box {
@@ -345,6 +401,7 @@ select {
   min-height: 24px;
   color: var(--muted);
   font-size: 11px;
+  margin-top: 6px;
 }
 
 #clean {
@@ -355,20 +412,22 @@ select {
 .status {
   min-height: 132px;
   margin: 0;
-  padding: 12px;
+  padding: 12px 14px;
   white-space: pre-wrap;
   word-break: break-word;
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--vscode-terminal-background, var(--vscode-editor-background));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--vscode-terminal-background, var(--vscode-editor-background)) 95%, #000);
   font-family: var(--vscode-editor-font-family);
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--muted);
 }
 
 .status.success {
   color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 30%, transparent);
 }
 
 .status.error {
@@ -377,50 +436,60 @@ select {
 }
 
 .status.running {
-  color: var(--vscode-terminal-ansiYellow, #dcdcaa);
+  color: var(--accent);
+  border-color: var(--accent-border);
 }
 
 .files {
   display: grid;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 .asset-drop {
   margin-top: 12px;
-  padding: 12px;
-  border: 1px dashed color-mix(in srgb, var(--border) 70%, var(--vscode-focusBorder));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--vscode-input-background) 88%, var(--vscode-editor-background));
+  padding: 12px 14px;
+  border: 1px dashed var(--accent-border);
+  border-radius: var(--radius);
+  background: var(--accent-dim);
 }
 
 .asset-drop strong {
   display: block;
-  margin-bottom: 4px;
-  font-size: 12px;
+  margin-bottom: 3px;
+  font-size: 11.5px;
+  color: var(--accent);
 }
 
 .asset-drop span {
   color: var(--muted);
-  font-size: 11.5px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .file-row {
   display: grid;
-  gap: 3px;
-  padding: 9px 10px;
+  gap: 2px;
+  padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--vscode-input-background);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  transition: border-color 0.12s;
+}
+
+.file-row:hover {
+  border-color: var(--accent-border);
 }
 
 .file-row b {
   font-size: 11px;
+  font-weight: 600;
 }
 
 .file-row code {
   color: var(--muted);
+  font-size: 10.5px;
+  font-family: var(--vscode-editor-font-family);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -438,7 +507,7 @@ select {
 }
 
 .handoff-actions.is-primary button {
-  min-width: 112px;
+  min-width: 100px;
 }
 
 .hidden {
@@ -461,7 +530,7 @@ select {
   }
 
   .app {
-    width: calc(100vw - 28px);
+    width: calc(100vw - 24px);
   }
 }
 </style>
