@@ -2,6 +2,9 @@
 
 All notable changes to the "ai-code-workflow" extension will be documented in this file.
 
+## 1.2.1
+- add versioning
+
 ## 1.2.0
 
 - Fixed per-file warning collection during patch analysis to avoid shared mutable state across parallel work.

@@ -107,7 +107,27 @@ async function previewChanges(result: ApplyResult): Promise<void> {
   );
 }
 
-function getHtml(nonce: string, initialProvider: string): string {
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, ch => {
+    switch (ch) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return ch;
+    }
+  });
+}
+
+
+function getHtml(nonce: string, initialProvider: string, extensionVersion: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -163,11 +183,18 @@ button, textarea {
   border-bottom: 1px solid var(--border);
 }
 
+.eyebrow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 0;
   color: var(--accent);
   font-size: 10px;
   font-weight: 700;
@@ -184,6 +211,22 @@ button, textarea {
   background: var(--accent);
   box-shadow: 0 0 6px var(--accent);
 }
+
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 8px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 
 h1, h2, h3, p {
   margin: 0;
@@ -560,7 +603,10 @@ select {
   <main class="app">
     <header class="topbar">
       <div>
-        <div class="eyebrow">AI coding workflow</div>
+        <div class="eyebrow-row">
+          <div class="eyebrow">AI coding workflow</div>
+          <span class="version-badge">v${escapeHtml(extensionVersion)}</span>
+        </div>
         <h1>AI Code Workflow</h1>
         <p class="subtitle">Create one clean request package for ChatGPT, Claude, Gemini, Grok, or any other AI chat, then review and apply the JSON patch safely inside VS Code.</p>
       </div>
@@ -977,7 +1023,10 @@ export function activate(context: vscode.ExtensionContext): void {
     }, undefined, context.subscriptions);
 
     const initialProvider = vscode.workspace.getConfiguration("aiCodeWorkflow").get<string>("defaultProvider", "chatgpt");
-    panel.webview.html = getHtml(generateNonce(), initialProvider);
+    const extensionVersion = typeof context.extension.packageJSON?.version === "string"
+      ? context.extension.packageJSON.version
+      : "dev";
+    panel.webview.html = getHtml(generateNonce(), initialProvider, extensionVersion);
 
     panel.webview.onDidReceiveMessage(async (msg: WebviewMessage) => {
       try {

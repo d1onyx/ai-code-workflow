@@ -24,11 +24,10 @@ export function runProcess(command: string, args: string[], options: RunProcessO
       return;
     }
 
-    const invocation = createInvocation(cleanCommand, args);
-    const child = cp.spawn(invocation.command, invocation.args, {
+    const child = cp.spawn(cleanCommand, args, {
       cwd: options.cwd,
       env: process.env,
-      shell: invocation.shell,
+      shell: process.platform === "win32",
       windowsHide: true,
     });
 
@@ -57,50 +56,4 @@ export function runProcess(command: string, args: string[], options: RunProcessO
       reject(new Error(stderr || stdout || `${cleanCommand} exited ${code}`));
     });
   });
-}
-
-function createInvocation(command: string, args: string[]): { command: string; args: string[]; shell: boolean } {
-  if (process.platform !== "win32") {
-    return { command, args, shell: false };
-  }
-
-  return {
-    command: "cmd.exe",
-    args: ["/d", "/s", "/c", [command, ...args].map(quoteWindowsCommandArg).join(" ")],
-    shell: false,
-  };
-}
-
-function quoteWindowsCommandArg(value: string): string {
-  if (value.length === 0) return '""';
-
-  let result = '"';
-  let backslashes = 0;
-
-  for (const ch of value) {
-    if (ch === "\\") {
-      backslashes++;
-      continue;
-    }
-
-    if (ch === '"') {
-      result += "\\".repeat(backslashes * 2 + 1);
-      result += '"';
-      backslashes = 0;
-      continue;
-    }
-
-    result += "\\".repeat(backslashes);
-    backslashes = 0;
-
-    if (/[%^&|<>()!]/u.test(ch)) {
-      result += "^";
-    }
-
-    result += ch;
-  }
-
-  result += "\\".repeat(backslashes * 2);
-  result += '"';
-  return result;
 }
