@@ -71,34 +71,32 @@ function repairJsonStrings(input: string): string {
       continue;
     }
 
-    if (ch === "\") {
+    if (ch === "\\") {
       out += ch;
-    escaped = true;
-    continue;
-  }
-
-  if (ch === "
-") {
-  out += "\n";
-  continue;
-}
-
-if (ch === "
-") {
-out += "\r";
-continue;
+      escaped = true;
+      continue;
     }
 
-if (ch === '"') {
-  inString = false;
-  out += ch;
-  continue;
-}
+    if (ch === "\n") {
+      out += "\\n";
+      continue;
+    }
 
-out += ch;
+    if (ch === "\r") {
+      out += "\\r";
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = false;
+      out += ch;
+      continue;
+    }
+
+    out += ch;
   }
 
-return removeTrailingCommasOutsideStrings(out);
+  return removeTrailingCommasOutsideStrings(out);
 }
 
 function removeTrailingCommasOutsideStrings(input: string): string {

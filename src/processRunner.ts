@@ -78,29 +78,29 @@ function quoteWindowsCommandArg(value: string): string {
   let backslashes = 0;
 
   for (const ch of value) {
-    if (ch === "\") {
+    if (ch === "\\") {
       backslashes++;
-    continue;
-  }
+      continue;
+    }
 
-  if (ch === '"') {
-    result += "\".repeat(backslashes * 2 + 1);
-    result += '"';
+    if (ch === '"') {
+      result += "\\".repeat(backslashes * 2 + 1);
+      result += '"';
+      backslashes = 0;
+      continue;
+    }
+
+    result += "\\".repeat(backslashes);
     backslashes = 0;
-    continue;
+
+    if (/[%^&|<>()!]/u.test(ch)) {
+      result += "^";
+    }
+
+    result += ch;
   }
 
-  result += "\".repeat(backslashes);
-  backslashes = 0;
-
-  if (/[%^&|<>()!]/u.test(ch)) {
-    result += "^";
-  }
-
-  result += ch;
-}
-
-result += "\".repeat(backslashes * 2);
-result += '"';
-return result;
+  result += "\\".repeat(backslashes * 2);
+  result += '"';
+  return result;
 }

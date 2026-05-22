@@ -68,6 +68,17 @@
             "grok"
           ],
           "description": "Default AI provider selected when the workflow panel opens."
+        },
+        "aiCodeWorkflow.defaultProvider": {
+          "type": "string",
+          "default": "chatgpt",
+          "enum": [
+            "chatgpt",
+            "claude",
+            "gemini",
+            "grok"
+          ],
+          "description": "Default AI provider selected when the workflow panel opens."
         }
       }
     }

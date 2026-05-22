@@ -49,10 +49,14 @@ async function formatChangedFiles(repo: string, result: ApplyResult): Promise<vo
     const uri = vscode.Uri.file(resolveRepoPath(repo, change.file));
     try {
       const doc = await vscode.workspace.openTextDocument(uri);
+      const editorConfig = vscode.workspace.getConfiguration("editor", uri);
       const edits = await vscode.commands.executeCommand<vscode.TextEdit[]>(
         "vscode.executeFormatDocumentProvider",
         uri,
-        doc.options
+        {
+          tabSize: editorConfig.get<number>("tabSize", 2),
+          insertSpaces: editorConfig.get<boolean>("insertSpaces", true),
+        }
       );
 
       if (!edits?.length) continue;
@@ -1026,8 +1030,7 @@ async function handleMessage(
         `Copied ${paths.length} file(s) to the Windows clipboard.`,
         "",
         "Now try Ctrl+V in your AI chat. If the website blocks file paste, use Open Handoff Folder and upload or drag the files together.",
-      ].join("
-"),
+      ].join("\n"),
       status: "success",
     });
     return;
