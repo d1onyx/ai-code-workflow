@@ -64,41 +64,43 @@ function createInvocation(command: string, args: string[]): { command: string; a
     return { command, args, shell: false };
   }
 
-  const commandLine = [command, ...args].map(quoteWindowsCommandArg).join(" ");
-
   return {
-    command: commandLine,
-    args: [],
-    shell: true,
+    command: "cmd.exe",
+    args: ["/d", "/s", "/c", [command, ...args].map(quoteWindowsCommandArg).join(" ")],
+    shell: false,
   };
 }
 
 function quoteWindowsCommandArg(value: string): string {
   if (value.length === 0) return '""';
-  if (!/[\s"]/u.test(value)) return value;
 
   let result = '"';
   let backslashes = 0;
 
   for (const ch of value) {
-    if (ch === "\\") {
+    if (ch === "\") {
       backslashes++;
-      continue;
-    }
-
-    if (ch === '"') {
-      result += "\\".repeat(backslashes * 2 + 1);
-      result += '"';
-      backslashes = 0;
-      continue;
-    }
-
-    result += "\\".repeat(backslashes);
-    result += ch;
-    backslashes = 0;
+    continue;
   }
 
-  result += "\\".repeat(backslashes * 2);
-  result += '"';
-  return result;
+  if (ch === '"') {
+    result += "\".repeat(backslashes * 2 + 1);
+    result += '"';
+    backslashes = 0;
+    continue;
+  }
+
+  result += "\".repeat(backslashes);
+  backslashes = 0;
+
+  if (/[%^&|<>()!]/u.test(ch)) {
+    result += "^";
+  }
+
+  result += ch;
+}
+
+result += "\".repeat(backslashes * 2);
+result += '"';
+return result;
 }

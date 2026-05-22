@@ -1,5 +1,7 @@
 You are editing a codebase provided by Repomix.
 
+Instruction schema version: 2.0.0
+
 CRITICAL OUTPUT RULES:
 
 * Return ONLY a single valid JSON object.

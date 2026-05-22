@@ -6,10 +6,10 @@ import { normalizeNewlines } from "./text";
 import { resolveRepoPath, validateOperation } from "./validation";
 
 export async function buildChanges(repo: string, payload: OperationsPayload): Promise<ApplyResult> {
-  const warnings: string[] = [];
   const groups = groupByFile(payload.operations);
-  const changes = await Promise.all(
+  const changesWithWarnings = await Promise.all(
     Array.from(groups.entries()).map(async ([file, operations]) => {
+      const warnings: string[] = [];
       const abs = resolveRepoPath(repo, file);
       const before = await readFileIfExists(abs);
       let current = before ?? "";
@@ -20,14 +20,17 @@ export async function buildChanges(repo: string, payload: OperationsPayload): Pr
       }
 
       const willDelete = operations.some(op => op.type === "delete_file");
-      return { file, before, after: willDelete ? null : current, operations };
+      return { change: { file, before, after: willDelete ? null : current, operations }, warnings };
     })
   );
 
   const order = Array.from(groups.keys());
-  changes.sort((a, b) => order.indexOf(a.file) - order.indexOf(b.file));
+  changesWithWarnings.sort((a, b) => order.indexOf(a.change.file) - order.indexOf(b.change.file));
 
-  return { changes, warnings };
+  return {
+    changes: changesWithWarnings.map(item => item.change),
+    warnings: changesWithWarnings.flatMap(item => item.warnings),
+  };
 }
 
 export async function applyChanges(repo: string, result: ApplyResult): Promise<void> {

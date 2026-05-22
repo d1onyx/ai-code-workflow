@@ -1,5 +1,5 @@
 import { OperationsPayload } from "./model";
-import { nextNonWhitespace, normalizeNewlines } from "./text";
+import { normalizeNewlines } from "./text";
 
 export function cleanJsonInput(input: string): string {
   let text = normalizeNewlines(input).trim();
@@ -71,33 +71,34 @@ function repairJsonStrings(input: string): string {
       continue;
     }
 
-    if (ch === "\\") {
+    if (ch === "\") {
       out += ch;
-      escaped = true;
-      continue;
-    }
-
-    if (ch === "\n") {
-      out += "\\n";
-      continue;
-    }
-
-    if (ch === '"') {
-      const next = nextNonWhitespace(input, i + 1);
-
-      if (next === ":" || next === "," || next === "}" || next === "]" || next === "") {
-        inString = false;
-        out += ch;
-      } else {
-        out += '\\"';
-      }
-      continue;
-    }
-
-    out += ch;
+    escaped = true;
+    continue;
   }
 
-  return removeTrailingCommasOutsideStrings(out);
+  if (ch === "
+") {
+  out += "\n";
+  continue;
+}
+
+if (ch === "
+") {
+out += "\r";
+continue;
+    }
+
+if (ch === '"') {
+  inString = false;
+  out += ch;
+  continue;
+}
+
+out += ch;
+  }
+
+return removeTrailingCommasOutsideStrings(out);
 }
 
 function removeTrailingCommasOutsideStrings(input: string): string {

@@ -29,6 +29,7 @@ AI Code Workflow is a VS Code extension for browser-based AI coding assistants s
 - `aiCodeWorkflow.instructionPath`: Optional custom instruction file. Relative paths resolve from the repository root.
 - `aiCodeWorkflow.repomixCommand`: Command used to refresh project context. Defaults to `npx`.
 - `aiCodeWorkflow.repomixArgs`: Arguments for the context command. Defaults to `["repomix"]`.
+- `aiCodeWorkflow.defaultProvider`: Provider selected when the workflow panel opens. Defaults to `chatgpt`.
 
 ## License
 

@@ -7,6 +7,8 @@ import { applyChanges, buildChanges, summarize, writeTempFile } from "./changes"
 import { MAX_INPUT_MB, TEMP_DIR_PREFIX, WARN_INPUT_MB } from "./constants";
 import { copyFilesToClipboard } from "./fileClipboard";
 import { getRepoRoot } from "./git";
+
+import { recordPatchHistory, saveUndoSnapshot } from "./history";
 import { cleanJsonInput, formatJsonInput, parsePayload } from "./jsonInput";
 import { ApplyResult } from "./model";
 import {
@@ -47,10 +49,18 @@ async function formatChangedFiles(repo: string, result: ApplyResult): Promise<vo
     const uri = vscode.Uri.file(resolveRepoPath(repo, change.file));
     try {
       const doc = await vscode.workspace.openTextDocument(uri);
-      await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
-      await vscode.commands.executeCommand("editor.action.formatDocument");
+      const edits = await vscode.commands.executeCommand<vscode.TextEdit[]>(
+        "vscode.executeFormatDocumentProvider",
+        uri,
+        doc.options
+      );
+
+      if (!edits?.length) continue;
+
+      const workspaceEdit = new vscode.WorkspaceEdit();
+      workspaceEdit.set(uri, edits);
+      await vscode.workspace.applyEdit(workspaceEdit);
       await doc.save();
-      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     } catch {
       // Formatting is best-effort because some file types may not have a formatter.
     }
@@ -93,7 +103,7 @@ async function previewChanges(result: ApplyResult): Promise<void> {
   );
 }
 
-function getHtml(nonce: string): string {
+function getHtml(nonce: string, initialProvider: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -452,6 +462,13 @@ select {
   border: 1px dashed var(--accent-border);
   border-radius: var(--radius);
   background: var(--accent-dim);
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.asset-drop.drag-over {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  transform: translateY(-1px);
 }
 
 .asset-drop strong {
@@ -565,7 +582,7 @@ select {
           <textarea id="prompt" class="prompt-box" spellcheck="false" placeholder="Add Markdown export support and update README."></textarea>
           <div class="stats">
             <span id="prompt-stats">Empty</span>
-            <span>Prepare always refreshes Repomix first</span>
+            <span id="autosave-status">Draft autosaved locally</span>
           </div>
           <div id="asset-drop" class="asset-drop" tabindex="0">
             <strong>Add screenshots and files</strong>
@@ -623,6 +640,8 @@ select {
           <div class="actions">
             <button id="load" class="secondary">Load File</button>
             <button id="format" class="secondary">Format JSON</button>
+
+            <button id="validate" class="secondary">Validate</button>
             <button id="analyze">Analyze</button>
             <button id="preview">Preview</button>
             <button id="apply" class="success-cta">Apply Patch</button>
@@ -660,6 +679,8 @@ select {
   let handoffDir = state.handoffDir || "";
   let handoffFilePaths = state.handoffFilePaths || [];
   let assets = state.assets || [];
+  const supportsFileClipboard = ${process.platform === "win32" ? "true" : "false"};
+  const encoder = new TextEncoder();
 
   const tabs = document.querySelectorAll(".tab");
   const prompt = document.getElementById("prompt");
@@ -669,13 +690,15 @@ select {
   const patchOutput = document.getElementById("patch-output");
   const promptStats = document.getElementById("prompt-stats");
   const patchStats = document.getElementById("patch-stats");
+
+  const autosaveStatus = document.getElementById("autosave-status");
   const copyFiles = document.getElementById("copy-files");
   const openHandoff = document.getElementById("open-handoff");
   const assetList = document.getElementById("asset-list");
 
   prompt.value = state.prompt || "";
   patchInput.value = state.patchInput || "";
-  provider.value = state.provider || "chatgpt";
+  provider.value = state.provider || ${JSON.stringify(initialProvider)};
 
   function persist() {
     vscode.setState({
@@ -687,7 +710,15 @@ select {
       provider: provider.value,
       assets
     });
+
+    updateAutosaveStatus();
   }
+
+  function updateAutosaveStatus() {
+    const savedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    autosaveStatus.textContent = "Draft autosaved at " + savedAt;
+  }
+
 
   function setTab(tab) {
     tabs.forEach(button => button.classList.toggle("active", button.dataset.tab === tab));
@@ -698,7 +729,7 @@ select {
 
   function byteStats(value) {
     const chars = value.length;
-    const kb = (new TextEncoder().encode(value).byteLength / 1024).toFixed(1);
+    const kb = (encoder.encode(value).byteLength / 1024).toFixed(1);
     return chars > 0 ? chars.toLocaleString() + " chars / " + kb + " KB" : "Empty";
   }
 
@@ -741,7 +772,8 @@ select {
   }
 
   function updatePreparedButtons() {
-    copyFiles.disabled = handoffFilePaths.length === 0;
+    copyFiles.classList.toggle("hidden", !supportsFileClipboard);
+    copyFiles.disabled = !supportsFileClipboard || handoffFilePaths.length === 0;
     openHandoff.disabled = !handoffDir;
   }
 
@@ -773,7 +805,10 @@ select {
     persist();
   });
   patchInput.addEventListener("input", () => { updateStats(); persist(); });
-  provider.addEventListener("change", persist);
+  provider.addEventListener("change", () => {
+    persist();
+    send("providerChanged");
+  });
 
   async function handlePaste(event) {
     const items = Array.from(event.clipboardData?.items || []);
@@ -801,7 +836,18 @@ select {
     });
   }
 
-  document.getElementById("asset-drop").addEventListener("paste", handlePaste);
+  const assetDrop = document.getElementById("asset-drop");
+  assetDrop.addEventListener("paste", handlePaste);
+  assetDrop.addEventListener("dragover", event => {
+    event.preventDefault();
+    assetDrop.classList.add("drag-over");
+  });
+  assetDrop.addEventListener("dragleave", () => assetDrop.classList.remove("drag-over"));
+  assetDrop.addEventListener("drop", event => {
+    event.preventDefault();
+    assetDrop.classList.remove("drag-over");
+    setStatus("builder", "Use Add Files to attach local files. Pasting screenshots still works here.", "idle");
+  });
   prompt.addEventListener("paste", handlePaste);
 
   document.getElementById("prepare-request").onclick = () => send("prepareRequest");
@@ -819,6 +865,8 @@ select {
   document.getElementById("cleanup-temp").onclick = () => send("cleanupTemp");
   document.getElementById("load").onclick = () => send("load");
   document.getElementById("format").onclick = () => send("format");
+
+  document.getElementById("validate").onclick = () => send("validate");
   document.getElementById("analyze").onclick = () => send("analyze");
   document.getElementById("preview").onclick = () => send("preview");
   document.getElementById("apply").onclick = () => send("apply");
@@ -900,7 +948,14 @@ function generateNonce(): string {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  let existingPanel: vscode.WebviewPanel | undefined;
+
   const openPanel = () => {
+    if (existingPanel) {
+      existingPanel.reveal(vscode.ViewColumn.One);
+      return;
+    }
+
     const panel = vscode.window.createWebviewPanel(
       "aiCodeWorkflow",
       "AI Code Workflow",
@@ -912,7 +967,13 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     );
 
-    panel.webview.html = getHtml(generateNonce());
+    existingPanel = panel;
+    panel.onDidDispose(() => {
+      existingPanel = undefined;
+    }, undefined, context.subscriptions);
+
+    const initialProvider = vscode.workspace.getConfiguration("aiCodeWorkflow").get<string>("defaultProvider", "chatgpt");
+    panel.webview.html = getHtml(generateNonce(), initialProvider);
 
     panel.webview.onDidReceiveMessage(async (msg: WebviewMessage) => {
       try {
@@ -946,6 +1007,15 @@ async function handleMessage(
     return;
   }
 
+  if (msg.type === "providerChanged") {
+    await vscode.workspace.getConfiguration("aiCodeWorkflow").update(
+      "defaultProvider",
+      msg.provider ?? "chatgpt",
+      vscode.ConfigurationTarget.Workspace
+    );
+    return;
+  }
+
   if (msg.type === "copyFiles") {
     const paths = msg.handoffFilePaths ?? [];
     if (paths.length === 0) throw new Error("Prepare an AI request first.");
@@ -956,7 +1026,8 @@ async function handleMessage(
         `Copied ${paths.length} file(s) to the Windows clipboard.`,
         "",
         "Now try Ctrl+V in your AI chat. If the website blocks file paste, use Open Handoff Folder and upload or drag the files together.",
-      ].join("\n"),
+      ].join("
+"),
       status: "success",
     });
     return;
@@ -996,7 +1067,7 @@ async function handleMessage(
     return;
   }
 
-  await handlePatchMessage(panel, msg);
+  await handlePatchMessage(context, panel, msg);
 }
 
 async function handlePasteAsset(panel: vscode.WebviewPanel, msg: WebviewMessage): Promise<void> {
@@ -1092,7 +1163,7 @@ async function handlePrepareRequest(
   });
 }
 
-async function handlePatchMessage(panel: vscode.WebviewPanel, msg: WebviewMessage): Promise<void> {
+async function handlePatchMessage(context: vscode.ExtensionContext, panel: vscode.WebviewPanel, msg: WebviewMessage): Promise<void> {
   if (msg.type === "load") {
     const selected = await vscode.window.showOpenDialog({
       canSelectMany: false,
@@ -1158,6 +1229,15 @@ async function handlePatchMessage(panel: vscode.WebviewPanel, msg: WebviewMessag
 
   const result = await buildChanges(repo, payload);
 
+  if (msg.type === "validate") {
+    postStatus(panel, {
+      area: "patch",
+      message: ["Validation passed. No files were changed.", "", summarize(result)].join("\n"),
+      status: "success",
+    });
+    return;
+  }
+
   if (msg.type === "analyze") {
     postStatus(panel, {
       area: "patch",
@@ -1178,8 +1258,14 @@ async function handlePatchMessage(panel: vscode.WebviewPanel, msg: WebviewMessag
   }
 
   if (msg.type === "apply") {
+    const files = result.changes.map(change => `- ${change.file}`).join("\n");
     const answer = await vscode.window.showWarningMessage(
-      `Apply ${payload.operations.length} operation(s) to ${result.changes.length} file(s)?`,
+      [
+        `Apply ${payload.operations.length} operation(s) to ${result.changes.length} file(s)?`,
+        "",
+        "Files:",
+        files,
+      ].join("\n"),
       { modal: true },
       "Apply"
     );
@@ -1188,8 +1274,15 @@ async function handlePatchMessage(panel: vscode.WebviewPanel, msg: WebviewMessag
       return;
     }
 
-    await applyChanges(repo, result);
-    await formatChangedFiles(repo, result);
+    await saveUndoSnapshot(context, result);
+    try {
+      await applyChanges(repo, result);
+      await formatChangedFiles(repo, result);
+      await recordPatchHistory(context, raw, result, "applied");
+    } catch (error: unknown) {
+      await recordPatchHistory(context, raw, result, "failed");
+      throw error;
+    }
 
     postStatus(panel, {
       area: "patch",
@@ -1204,7 +1297,7 @@ function postStatus(panel: vscode.WebviewPanel, message: StatusMessage): void {
 }
 
 function isPatchAction(type: string): boolean {
-  return new Set(["load", "format", "analyze", "preview", "apply"]).has(type);
+  return new Set(["load", "format", "validate", "analyze", "preview", "apply"]).has(type);
 }
 
 function getErrorMessage(error: unknown): string {

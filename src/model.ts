@@ -38,3 +38,22 @@ export interface ApplyResult {
   changes: FileChange[];
   warnings: string[];
 }
+
+
+export interface PatchHistoryEntry {
+  id: string;
+  timestamp: number;
+  operationsCount: number;
+  filesAffected: string[];
+  status: "applied" | "failed";
+  rawJson: string;
+}
+
+export interface UndoSnapshot {
+  id: string;
+  timestamp: number;
+  files: Array<{
+    file: string;
+    before: string | null;
+  }>;
+}

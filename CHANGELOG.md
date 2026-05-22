@@ -2,6 +2,18 @@
 
 All notable changes to the "ai-code-workflow" extension will be documented in this file.
 
+## 1.2.0
+
+- Fixed per-file warning collection during patch analysis to avoid shared mutable state across parallel work.
+- Reused a singleton workflow webview panel instead of opening duplicate panels.
+- Hid Windows-only file clipboard actions on unsupported platforms.
+- Persisted the selected AI provider in workspace settings.
+- Reduced formatting flicker by applying format edits without showing and closing editor tabs.
+- Hardened JSON string repair and Windows process invocation.
+- Added a Validate action for dry-run patch checks.
+- Added basic patch history and undo helpers for future UI wiring.
+
+
 ## 1.0.5
 
 - Renamed the extension to AI Code Workflow for provider-neutral use.
