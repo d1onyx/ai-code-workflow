@@ -21,6 +21,7 @@ import {
   updateProjectContext,
 } from "./workflow";
 import { resolveRepoPath } from "./validation";
+import { searchDomBindings, searchEventListeners, searchMarkup, searchScript, searchStyles } from "./webview/search";
 
 interface WebviewMessage {
   type: string;
@@ -164,7 +165,7 @@ body {
   background: var(--vscode-editor-background);
 }
 
-button, textarea {
+button, textarea, input {
   font-family: inherit;
 }
 
@@ -429,6 +430,8 @@ textarea:focus {
   border-color: var(--accent-border);
   box-shadow: 0 0 0 2px var(--accent-dim);
 }
+
+${searchStyles}
 
 select {
   width: 138px;
@@ -698,8 +701,7 @@ select {
           </div>
         </div>
         <div class="panel-body">
-          <label for="patch-input">AI patch payload</label>
-          <textarea id="patch-input" spellcheck="false" placeholder='{ "operations": [] }'></textarea>
+${searchMarkup}
           <div class="stats">
             <span id="patch-stats">Empty</span>
             <button id="clean" class="ghost">Clear</button>
@@ -738,6 +740,7 @@ select {
   const provider = document.getElementById("provider");
   const builderOutput = document.getElementById("builder-output");
   const patchOutput = document.getElementById("patch-output");
+${searchDomBindings}
   const promptStats = document.getElementById("prompt-stats");
   const patchStats = document.getElementById("patch-stats");
 
@@ -748,12 +751,14 @@ select {
 
   prompt.value = state.prompt || "";
   patchInput.value = state.patchInput || "";
+  patchSearchInput.value = state.patchSearchInput || "";
   provider.value = state.provider || ${JSON.stringify(initialProvider)};
 
   function persist() {
     vscode.setState({
       prompt: prompt.value,
       patchInput: patchInput.value,
+      patchSearchInput: patchSearchInput.value,
       preparedPrompt,
       handoffDir,
       handoffFilePaths,
@@ -785,8 +790,17 @@ select {
 
   function updateStats() {
     promptStats.textContent = byteStats(prompt.value);
-    patchStats.textContent = byteStats(patchInput.value);
+    const search = patchSearchInput.value;
+    if (!search) {
+      patchStats.textContent = byteStats(patchInput.value);
+      return;
+    }
+
+    const matches = searchMatches.length;
+    patchStats.textContent = byteStats(patchInput.value) + " / " + matches + " match" + (matches === 1 ? "" : "es");
   }
+
+${searchScript}
 
   function renderAssets() {
     assetList.innerHTML = "";
@@ -818,7 +832,10 @@ select {
       if (button.classList.contains("tab")) return;
       button.disabled = isBusy || button.dataset.locked === "true";
     });
-    if (!isBusy) updatePreparedButtons();
+    if (!isBusy) {
+      updatePreparedButtons();
+      updateSearchUi();
+    }
   }
 
   function updatePreparedButtons() {
@@ -840,6 +857,7 @@ select {
       type,
       prompt: prompt.value,
       patchInput: patchInput.value,
+      patchSearchInput: patchSearchInput.value,
       preparedPrompt,
       handoffDir,
       handoffFilePaths,
@@ -854,7 +872,7 @@ select {
     invalidatePreparedRequest();
     persist();
   });
-  patchInput.addEventListener("input", () => { updateStats(); persist(); });
+${searchEventListeners}
   provider.addEventListener("change", () => {
     persist();
     send("providerChanged");
@@ -984,7 +1002,7 @@ select {
   });
 
   setTab(state.activeTab || "builder");
-  updateStats();
+  updateSearchUi();
   renderAssets();
   updatePreparedButtons();
 })();
