@@ -18,6 +18,15 @@ export interface HandoffAsset {
   path: string;
 }
 
+export interface RepomixPathRule {
+  action: "include" | "exclude";
+  path: string;
+}
+
+export interface RepomixPathSelection {
+  rules: RepomixPathRule[];
+}
+
 export interface PreparedRequest {
   prompt: string;
   projectContextPath: string;
@@ -27,19 +36,65 @@ export interface PreparedRequest {
   allFilePaths: string[];
 }
 
-export async function updateProjectContext(repo: string, onOutput?: (chunk: string) => void): Promise<string> {
+export async function updateProjectContext(
+  repo: string,
+  onOutput?: (chunk: string) => void,
+  selection?: RepomixPathSelection
+): Promise<string> {
   const config = vscode.workspace.getConfiguration("aiCodeWorkflow");
   const command = config.get<string>("repomixCommand", "npx").trim() || "npx";
   const configuredArgs = config.get<unknown>("repomixArgs", ["repomix"]);
   const args = (Array.isArray(configuredArgs) ? configuredArgs : ["repomix"]).map(String).filter(Boolean);
+  const repomixArgs = await buildRepomixArgs(args, repo, selection);
 
   try {
-    await runProcess(command, args, { cwd: repo, onOutput });
+    await runProcess(command, repomixArgs, { cwd: repo, onOutput });
   } catch (error: unknown) {
-    throw new Error(formatRepomixError(command, args, repo, error));
+    throw new Error(formatRepomixError(command, repomixArgs, repo, error));
   }
 
   return findProjectContextFile(repo);
+}
+
+async function buildRepomixArgs(
+  baseArgs: string[],
+  repo: string,
+  selection?: RepomixPathSelection
+): Promise<string[]> {
+  const rules = selection?.rules ?? [];
+  if (rules.length === 0) return baseArgs;
+
+  const includeRules = rules.filter(rule => rule.action === "include");
+  const excludeRules = rules.filter(rule => rule.action === "exclude");
+  const args = [...baseArgs];
+
+  if (includeRules.length > 0) {
+    const includePatterns = await Promise.all(includeRules.map(rule => toRepomixPattern(repo, rule.path)));
+    const filtered = includePatterns.filter(Boolean);
+    if (filtered.length > 0) args.push("--include", filtered.join(","));
+  }
+
+  if (excludeRules.length > 0) {
+    const excludePatterns = await Promise.all(excludeRules.map(rule => toRepomixPattern(repo, rule.path)));
+    const filtered = excludePatterns.filter(Boolean);
+    if (filtered.length > 0) args.push("--ignore", filtered.join(","));
+  }
+
+  return args;
+}
+
+async function toRepomixPattern(repo: string, filePath: string): Promise<string> {
+  const resolvedRepo = path.resolve(repo);
+  const resolvedPath = path.resolve(filePath);
+  const relative = path.relative(resolvedRepo, resolvedPath);
+
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(`Repomix selection must stay inside the workspace: ${filePath}`);
+  }
+
+  const normalized = relative.split(path.sep).join("/");
+  const stats = await fs.stat(resolvedPath);
+  return stats.isDirectory() ? `${normalized}/**` : normalized;
 }
 
 export async function prepareAiRequest(
