@@ -2,6 +2,13 @@
 
 All notable changes to the "ai-code-workflow" extension will be documented in this file.
 
+## 1.2.2
+
+- Added Repomix scope rules in the request builder for selecting files/folders to include or exclude before preparing project context.
+- Persisted Repomix include/exclude rules in the workflow draft and reset the prepared request when the scope changes.
+- Converted selected workspace paths into Repomix `--include` and `--ignore` patterns, with validation that selections stay inside the repository.
+- Added search for the AI patch payload with match counts, previous/next navigation, and an active-match highlight in the Review & Apply Patch panel.
+
 ## 1.2.1
 - add versioning
 
